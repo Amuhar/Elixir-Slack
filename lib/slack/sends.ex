@@ -10,35 +10,57 @@ defmodule Slack.Sends do
   NOTE: Referencing `"@USER_NAME"` is deprecated, and should not be used.
   For more information see https://api.slack.com/changelog/2017-09-the-one-about-usernames
   """
-  def send_message(text, channel = "#" <> channel_name, slack) do
+
+  def send_message(text, channel, slack, thread_ts \\ nil)
+
+  def send_message(text, channel = "#" <> channel_name, slack, thread_ts) do
     channel_id = Lookups.lookup_channel_id(channel, slack)
 
     if channel_id do
-      send_message(text, channel_id, slack)
+      send_message(text, channel_id, slack, thread_ts)
     else
       raise ArgumentError, "channel ##{channel_name} not found"
     end
   end
 
-  def send_message(text, user_id = "U" <> _user_id, slack) do
-    send_message_to_user(text, user_id, slack)
+  def send_message(text, user_id = "U" <> _user_id, slack, thread_ts) do
+    send_message_to_user(text, user_id, slack, thread_ts)
   end
 
-  def send_message(text, user_id = "W" <> _user_id, slack) do
-    send_message_to_user(text, user_id, slack)
+  def send_message(text, user_id = "W" <> _user_id, slack, thread_ts) do
+    send_message_to_user(text, user_id, slack, thread_ts)
   end
 
-  def send_message(text, user = "@" <> _user_name, slack) do
+  def send_message(text, user = "@" <> _user_name, slack, thread_ts) do
     user_id = Lookups.lookup_user_id(user, slack)
-    send_message(text, user_id, slack)
+    send_message(text, user_id, slack, thread_ts)
   end
 
-  def send_message(text, channel, slack) do
-    %{
-      type: "message",
-      text: text,
-      channel: channel
-    }
+  def send_message(text, channel, slack, nil) do
+    send_message(
+      %{
+        type: "message",
+        text: text,
+        channel: channel
+      },
+      slack
+    )
+  end
+
+  def send_message(text, channel, slack, thread_ts) do
+    send_message(
+      %{
+        type: "message",
+        text: text,
+        channel: channel,
+        thread_ts: thread_ts
+      },
+      slack
+    )
+  end
+
+  def send_message(message, slack) do
+    message
     |> Poison.encode!()
     |> send_raw(slack)
   end
@@ -86,16 +108,16 @@ defmodule Slack.Sends do
     client.cast(pid, {:text, json})
   end
 
-  defp send_message_to_user(text, user_id, slack) do
+  defp send_message_to_user(text, user_id, slack, thread_ts) do
     direct_message_id = Lookups.lookup_direct_message_id(user_id, slack)
 
     if direct_message_id do
-      send_message(text, direct_message_id, slack)
+      send_message(text, direct_message_id, slack, thread_ts)
     else
       open_im_channel(
         slack.token,
         user_id,
-        fn id -> send_message(text, id, slack) end,
+        fn id -> send_message(text, id, slack, thread_ts) end,
         fn reason -> reason end
       )
     end
