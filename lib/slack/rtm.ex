@@ -6,6 +6,7 @@ defmodule Slack.JsonDecodeError do
   def message(%Slack.JsonDecodeError{reason: reason, string: string}) do
     "Poison could not decode string for reason: `:#{reason}`, string given:\n#{string}"
   end
+end
 
 defmodule Slack.Rtm do
   @moduledoc false
